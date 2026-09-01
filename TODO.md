@@ -8,11 +8,11 @@
 - [x] Su parte del reporte: descripción del algoritmo Dijkstra y de su implementación
 
 ## Fase 2 Flooding
-- [ ] Descubrimiento de vecinos (paquete hello/ping)
-- [ ] Implementación de flooding (reenvío a todos los vecinos menos el emisor, control de TTL y duplicados)
-- [ ] Modo standalone "flooding" (nodo ejecutándose con este algoritmo como algoritmo de red)
-- [ ] Pruebas unitarias de Flooding
-- [ ] Su parte del reporte: descripción del algoritmo Flooding y de su implementación
+- [x] Descubrimiento de vecinos (paquete hello/ping)
+- [x] Implementación de flooding (reenvío a todos los vecinos menos el emisor, control de TTL y duplicados)
+- [x] Modo standalone "flooding" (nodo ejecutándose con este algoritmo como algoritmo de red)
+- [x] Pruebas unitarias de Flooding
+- [x] Su parte del reporte: descripción del algoritmo Flooding y de su implementación
 
 ## Fase 3 Infraestructura de red
 - [ ] Manejo de sockets (envío/recepción de paquetes)
