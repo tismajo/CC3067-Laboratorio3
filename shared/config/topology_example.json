@@ -7,5 +7,13 @@
     {"node_id": "B", "ip": "127.0.0.1", "port": 5001, "weight": 7},
     {"node_id": "I", "ip": "127.0.0.1", "port": 5002, "weight": 1},
     {"node_id": "C", "ip": "127.0.0.1", "port": 5003, "weight": 7}
-  ]
+  ],
+  "topology": {
+    "nodes": ["A", "B", "C", "I"],
+    "edges": [
+      {"node_a": "A", "node_b": "B", "weight": 7},
+      {"node_a": "A", "node_b": "I", "weight": 1},
+      {"node_a": "A", "node_b": "C", "weight": 7}
+    ]
+  }
 }

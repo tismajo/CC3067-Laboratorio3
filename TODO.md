@@ -1,7 +1,7 @@
 # TODO - Laboratorio 3 (Algoritmos de Enrutamiento)
 
 ## Fase 1 Dijkstra
-- [ ] Modelo de topología (nodos, aristas, pesos) leído desde config
+- [x] Modelo de topología (nodos, aristas, pesos) leído desde config
 - [ ] Implementación del algoritmo de Dijkstra
 - [ ] Modo standalone "dijkstra" (nodo ejecutándose con este algoritmo como algoritmo de red)
 - [ ] Pruebas unitarias de Dijkstra

@@ -1,32 +1,39 @@
-"""
-Fase 1 (Dijkstra)
-
-Modelo de la topología completa (nodos y aristas con peso) que Dijkstra
-necesita para funcionar. A diferencia de Flooding, Dijkstra sí requiere
-conocer la topología completa, no solo los vecinos directos.
-
-TODO:
-- [ ] Clase Topology con nodos y aristas (peso)
-- [ ] Método from_json(data: dict) -> Topology (carga desde config o desde
-      la info recibida, si se usa dentro de LSR)
-- [ ] Método add_edge(node_a, node_b, weight)
-- [ ] Método get_neighbors(node) -> lista de (vecino, peso)
-- [ ] Método remove_node / mark_down(node) (para pruebas de caída de nodos)
-"""
-
 class Topology:
     def __init__(self):
-        raise NotImplementedError
+        self._adjacency = {}
+
+    @property
+    def nodes(self) -> set:
+        return set(self._adjacency)
 
     @classmethod
     def from_json(cls, data: dict):
-        raise NotImplementedError
+        topology_data = data.get("topology", data)
+        topology = cls()
+
+        for node in topology_data["nodes"]:
+            topology._adjacency[node] = {}
+
+        for edge in topology_data["edges"]:
+            topology.add_edge(
+                edge["node_a"],
+                edge["node_b"],
+                edge["weight"],
+            )
+
+        return topology
 
     def add_edge(self, node_a: str, node_b: str, weight: float):
-        raise NotImplementedError
+        if weight < 0:
+            raise ValueError("Dijkstra no admite pesos negativos")
+
+        self._adjacency.setdefault(node_a, {})[node_b] = weight
+        self._adjacency.setdefault(node_b, {})[node_a] = weight
 
     def get_neighbors(self, node: str):
-        raise NotImplementedError
+        return list(self._adjacency.get(node, {}).items())
 
     def mark_down(self, node: str):
-        raise NotImplementedError
+        self._adjacency.pop(node, None)
+        for neighbors in self._adjacency.values():
+            neighbors.pop(node, None)
