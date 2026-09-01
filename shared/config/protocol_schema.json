@@ -1,0 +1,31 @@
+{
+  "_comment": "Editar SOLO este archivo si el dia de la prueba hay que renombrar campos, agregar un nuevo 'type'/'proto', o cambiar el TTL por defecto. Nadie debe hardcodear estos strings en el codigo: siempre usar shared/constants.py.",
+
+  "field_names": {
+    "proto": "proto",
+    "type": "type",
+    "from": "from",
+    "to": "to",
+    "ttl": "ttl",
+    "headers": "headers",
+    "payload": "payload"
+  },
+
+  "proto_values": {
+    "DIJKSTRA": "dijkstra",
+    "FLOODING": "flooding",
+    "LSR": "lsr"
+  },
+
+  "type_values": {
+    "HELLO": "hello",
+    "MESSAGE": "message",
+    "INFO": "info"
+  },
+
+  "defaults": {
+    "ttl": 8
+  },
+
+  "required_fields": ["proto", "type", "from", "to", "ttl", "payload"]
+}

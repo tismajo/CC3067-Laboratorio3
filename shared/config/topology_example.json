@@ -1,0 +1,11 @@
+{
+  "_comment": "Ejemplo de configuración de un nodo. Ajustar según la topología de la Imagen 1 del enunciado o la que entregue el profesor el día de la prueba.",
+  "node_id": "A",
+  "ip": "127.0.0.1",
+  "port": 5000,
+  "neighbors": [
+    {"node_id": "B", "ip": "127.0.0.1", "port": 5001, "weight": 7},
+    {"node_id": "I", "ip": "127.0.0.1", "port": 5002, "weight": 1},
+    {"node_id": "C", "ip": "127.0.0.1", "port": 5003, "weight": 7}
+  ]
+}
