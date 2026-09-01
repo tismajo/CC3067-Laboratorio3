@@ -1,5 +1,5 @@
 """
-DUEÑO: EA (Ernesto Ascencio) - Fase 3 (Infraestructura de red)
+Fase 3 (Infraestructura de red)
 
 Punto de entrada del nodo. Debe permitir levantar un nodo en cualquiera de
 los 3 modos de forma independiente:
@@ -8,7 +8,7 @@ los 3 modos de forma independiente:
     python -m node.main --config shared/config/topology_example.json --mode flooding
     python -m node.main --config shared/config/topology_example.json --mode lsr
 
-TODO (EA):
+TODO:
 - [ ] Parsear argumentos: --config, --mode
 - [ ] Cargar configuración (node_id, ip, port, neighbors) desde el JSON
 - [ ] Instanciar SocketManager (node/network/socket_manager.py)

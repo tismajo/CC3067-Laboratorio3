@@ -1,10 +1,10 @@
 """
-DUEÑO: EA (Ernesto Ascencio) - Fase 3 (Infraestructura de red)
+Fase 3 (Infraestructura de red)
 
 Encargado de abrir el socket del nodo, escuchar conexiones/paquetes entrantes
 y exponer un método para enviar paquetes a otro nodo (por IP:puerto).
 
-TODO (EA):
+TODO:
 - [ ] Clase SocketManager(ip, port)
 - [ ] Método start_listening(on_packet_received: callable) -> corre en su propio hilo
 - [ ] Método send(to_ip, to_port, packet: dict) -> usa shared/protocol.serialize()

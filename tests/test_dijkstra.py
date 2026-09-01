@@ -1,5 +1,5 @@
 """
-DUEÑO: MJ (María José Girón)
+Fase 1
 
 TODO: pruebas unitarias de node/algorithms/dijkstra/*
 - [ ] test_shortest_path_simple_graph

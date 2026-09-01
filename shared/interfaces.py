@@ -1,5 +1,5 @@
 """
-DUEÑO: EA (Ernesto Ascencio) - Fase 0
+Fase 0
 
 Este es el contrato que permite que MJ (Dijkstra), LDM (Flooding) y HDB (LSR)
 trabajen en paralelo sin esperarse entre sí ni esperar a que EA termine

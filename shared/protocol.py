@@ -1,5 +1,5 @@
 """
-DUEÑO: EA (Ernesto Ascencio) - Fase 0 / Fase 3
+Fase 0 / Fase 3
 USADO POR: todos los demás módulos (Dijkstra, Flooding, LSR)
 
 Único punto de entrada para construir/leer paquetes. Nadie más debería

@@ -1,5 +1,5 @@
 """
-DUEÑO: EA (Ernesto Ascencio) - Fase 0 / Fase 3
+Fase 0 / Fase 3
 
 Carga shared/config/protocol_schema.json y expone constantes para que el
 resto del código NUNCA use strings literales como "proto" o "hello".

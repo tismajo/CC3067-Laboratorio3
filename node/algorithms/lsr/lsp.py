@@ -1,11 +1,11 @@
 """
-DUEÑO: HDB (Hugo Daniel Barillas) - Fase 4 (Link State Routing)
-DEPENDE DE: shared/protocol.py (EA), ya terminado antes de empezar esta fase
+Fase 4 (Link State Routing)
+DEPENDE DE: shared/protocol.py ya terminado antes de empezar esta fase
 
 Formato del Link State Packet (LSP) que cada nodo genera y distribuye por
 flooding para que todos conozcan la topología completa.
 
-TODO (HDB):
+TODO:
 - [ ] Definir la estructura del LSP: node_id, secuencia/timestamp, lista de
       (vecino, peso) del nodo que lo generó
 - [ ] build_lsp(node_id, sequence, neighbors) -> dict (contenido para el

@@ -1,5 +1,5 @@
 """
-DUEÑO: EA (Ernesto Ascencio) - Fase 3 (Infraestructura de red)
+Fase 3 (Infraestructura de red)
 
 Proceso/hilo de forwarding: decide qué hacer con cada paquete que entra o sale.
 
@@ -16,7 +16,7 @@ Salientes:
 - Envío de HELLO/PING
 - Confirmaciones de recepción (si se implementan)
 
-TODO (EA):
+TODO:
 - [ ] handle_incoming_packet(packet: dict) -> despacha según packet["type"]
 - [ ] forward_data_packet(packet: dict) -> usa routing_table para decidir el siguiente salto
 - [ ] forward_info_packet(packet: dict) -> entrega el payload al algoritmo activo

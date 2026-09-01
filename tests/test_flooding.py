@@ -1,5 +1,5 @@
 """
-DUEÑO: LDM (Leonardo Dufrey Mejía)
+Fase 2
 
 TODO: pruebas unitarias de node/algorithms/flooding/*
 - [ ] test_should_forward_respects_ttl

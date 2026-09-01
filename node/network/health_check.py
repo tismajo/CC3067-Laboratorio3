@@ -1,11 +1,11 @@
 """
-DUEÑO: EA (Ernesto Ascencio) - Fase 3 (Infraestructura de red)
+Fase 3 (Infraestructura de red)
 
 Chequeo periódico de salud de los vecinos (mencionado en las notas del
 profesor: "Deberemos tener un tipo de chequeo de salud para validar que
 nuestros vecinos están en pie").
 
-TODO (EA):
+TODO:
 - [ ] Enviar HELLO/PING periódico a cada vecino
 - [ ] Marcar vecino como "caído" si no responde tras N intentos
 - [ ] Marcar vecino como "recuperado" cuando vuelva a responder

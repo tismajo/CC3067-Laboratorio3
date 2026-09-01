@@ -1,5 +1,5 @@
 """
-DUEÑO: LDM (Leonardo Dufrey Mejía) - Fase 2 (Flooding)
+Fase 2 (Flooding)
 
 Implementación de flooding: reenvía cada paquete recibido a todos los
 vecinos activos excepto por quien llegó, controlando TTL y evitando
@@ -13,7 +13,7 @@ Por eso NO debe depender directamente de sockets: expone funciones que
 reciben/regresan paquetes (dict), y quien los envía de verdad es
 node/network/socket_manager.py (a través de forwarding.py).
 
-TODO (LDM):
+TODO:
 - [ ] Clase o funciones para trackear IDs de paquetes ya vistos (evitar duplicados)
 - [ ] should_forward(packet: dict) -> bool (chequea TTL y si ya se vio)
 - [ ] get_forward_targets(packet: dict, neighbor_table: NeighborTable, received_from) -> lista de vecinos a los que reenviar

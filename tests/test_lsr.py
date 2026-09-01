@@ -1,5 +1,5 @@
 """
-DUEÑO: HDB (Hugo Daniel Barillas)
+Fase 4
 
 TODO: pruebas unitarias de node/algorithms/lsr/*
 - [ ] test_build_and_parse_lsp

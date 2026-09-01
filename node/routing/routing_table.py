@@ -1,12 +1,12 @@
 """
-DUEÑO: EA (Ernesto Ascencio) - Fase 3 (Infraestructura de red)
+Fase 3 (Infraestructura de red)
 
 Estructura compartida y thread-safe que guarda la tabla de ruteo actual del
 nodo: {destino: siguiente_salto}. La llenan los algoritmos (dijkstra.py,
 flooding.py o link_state.py, según el modo) y la consulta forwarding.py
 para decidir a quién reenviar un paquete de datos.
 
-TODO (EA):
+TODO:
 - [ ] Clase RoutingTable con lock (thread-safe: routing y forwarding corren
       en hilos distintos)
 - [ ] Método update(new_table: dict)

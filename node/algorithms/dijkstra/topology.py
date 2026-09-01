@@ -1,11 +1,11 @@
 """
-DUEÑO: MJ (María José Girón) - Fase 1 (Dijkstra)
+Fase 1 (Dijkstra)
 
 Modelo de la topología completa (nodos y aristas con peso) que Dijkstra
 necesita para funcionar. A diferencia de Flooding, Dijkstra sí requiere
 conocer la topología completa, no solo los vecinos directos.
 
-TODO (MJ):
+TODO:
 - [ ] Clase Topology con nodos y aristas (peso)
 - [ ] Método from_json(data: dict) -> Topology (carga desde config o desde
       la info recibida, si se usa dentro de LSR)
