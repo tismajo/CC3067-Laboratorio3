@@ -5,7 +5,7 @@
 - [x] Implementación del algoritmo de Dijkstra
 - [x] Modo standalone "dijkstra" (nodo ejecutándose con este algoritmo como algoritmo de red)
 - [x] Pruebas unitarias de Dijkstra
-- [ ] Su parte del reporte: descripción del algoritmo Dijkstra y de su implementación
+- [x] Su parte del reporte: descripción del algoritmo Dijkstra y de su implementación
 
 ## Fase 2 Flooding
 - [ ] Descubrimiento de vecinos (paquete hello/ping)
