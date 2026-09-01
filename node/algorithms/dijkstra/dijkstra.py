@@ -1,29 +1,44 @@
-"""
-Fase 1 (Dijkstra)
-
-Implementación del algoritmo de caminos más cortos. Debe poder usarse:
-1. De forma standalone (modo "dijkstra" del nodo, topología estática)
-2. Desde LSR (HDB la llamará una vez tenga la topología derivada de los LSPs)
-
-Por eso NO debe depender de sockets ni de nada de node/network: recibe una
-Topology y un nodo origen, y regresa la tabla de ruteo. Debe ser un módulo
-puro y fácil de testear con pytest.
-
-TODO:
-- [ ] shortest_paths(topology: Topology, source: str) -> dict[nodo, (costo, siguiente_salto)]
-- [ ] build_routing_table(topology: Topology, source: str) -> dict listo para
-      que node/routing/routing_table.py lo use directamente
-- [ ] Manejo de nodos inalcanzables (costo infinito)
-- [ ] Recalcular cuando la topología cambia (recibe una nueva Topology)
-"""
+import heapq
+import math
 
 from node.algorithms.dijkstra.topology import Topology
 
 
 def shortest_paths(topology: Topology, source: str) -> dict:
-    """Regresa {nodo_destino: (costo_total, siguiente_salto)} desde 'source'."""
-    raise NotImplementedError
+    if source not in topology.nodes:
+        raise ValueError(f"El nodo de origen no existe: {source}")
+
+    distances = {node: math.inf for node in topology.nodes}
+    next_hops = {node: None for node in topology.nodes}
+    distances[source] = 0
+    pending = [(0, source)]
+
+    while pending:
+        current_distance, current = heapq.heappop(pending)
+        if current_distance > distances[current]:
+            continue
+
+        for neighbor, weight in topology.get_neighbors(current):
+            candidate = current_distance + weight
+            if candidate >= distances[neighbor]:
+                continue
+
+            distances[neighbor] = candidate
+            next_hops[neighbor] = (
+                neighbor if current == source else next_hops[current]
+            )
+            heapq.heappush(pending, (candidate, neighbor))
+
+    return {
+        node: (distances[node], next_hops[node])
+        for node in topology.nodes
+    }
 
 
 def build_routing_table(topology: Topology, source: str) -> dict:
-    raise NotImplementedError
+    paths = shortest_paths(topology, source)
+    return {
+        destination: next_hop
+        for destination, (cost, next_hop) in paths.items()
+        if destination != source and cost < math.inf
+    }

@@ -2,7 +2,7 @@
 
 ## Fase 1 Dijkstra
 - [x] Modelo de topología (nodos, aristas, pesos) leído desde config
-- [ ] Implementación del algoritmo de Dijkstra
+- [x] Implementación del algoritmo de Dijkstra
 - [ ] Modo standalone "dijkstra" (nodo ejecutándose con este algoritmo como algoritmo de red)
 - [ ] Pruebas unitarias de Dijkstra
 - [ ] Su parte del reporte: descripción del algoritmo Dijkstra y de su implementación
