@@ -15,12 +15,12 @@
 - [x] Su parte del reporte: descripción del algoritmo Flooding y de su implementación
 
 ## Fase 3 Infraestructura de red
-- [ ] Manejo de sockets (envío/recepción de paquetes)
-- [ ] Serialización/deserialización de paquetes según el protocolo JSON
-- [ ] Separación en hilos/procesos paralelos: forwarding y routing
-- [ ] Manejo genérico de paquetes entrantes/salientes (data, info, hello) a nivel forwarding
-- [ ] Chequeo de salud de vecinos (health check)
-- [ ] Su parte del reporte: descripción de la arquitectura de red (sockets, hilos, protocolo)
+- [x] Manejo de sockets (envío/recepción de paquetes)
+- [x] Serialización/deserialización de paquetes según el protocolo JSON
+- [x] Separación en hilos/procesos paralelos: forwarding y routing
+- [x] Manejo genérico de paquetes entrantes/salientes (data, info, hello) a nivel forwarding
+- [x] Chequeo de salud de vecinos (health check)
+- [x] Su parte del reporte: descripción de la arquitectura de red (sockets, hilos, protocolo)
 
 ## Fase 4 Link State Routing (una vez existan Dijkstra y Flooding)
 - [ ] Formato del LSP (Link State Packet) dentro del `payload`
