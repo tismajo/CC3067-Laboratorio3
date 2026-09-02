@@ -1,24 +1,77 @@
 """
 Fase 3 (Infraestructura de red)
 
-Chequeo periódico de salud de los vecinos (mencionado en las notas del
-profesor: "Deberemos tener un tipo de chequeo de salud para validar que
-nuestros vecinos están en pie").
+Chequeo periódico de salud de los vecinos: envía un HELLO/PING a cada uno
+cada `interval_seconds`. Un envío que falla (vecino caído, timeout) cuenta
+como intento fallido; tras `max_failures` intentos fallidos consecutivos el
+vecino se marca "caído" y se notifica via `on_status_change`. Si un vecino
+caído vuelve a responder, se marca "recuperado".
 
-TODO:
-- [ ] Enviar HELLO/PING periódico a cada vecino
-- [ ] Marcar vecino como "caído" si no responde tras N intentos
-- [ ] Marcar vecino como "recuperado" cuando vuelva a responder
-- [ ] Notificar al proceso de routing cuando cambie el estado de un vecino
-      (esto dispara recomputo de tabla en dijkstra/flooding/lsr)
+Es agnóstico del algoritmo de ruteo: quien conecta `on_status_change` con
+`RoutingAlgorithm.handle_neighbor_up/down` es node/main.py.
 """
 
+from __future__ import annotations
+
+import threading
+
+from node.network.socket_manager import NeighborUnreachableError
+
+DEFAULT_MAX_FAILURES = 3
+
+
 class HealthChecker:
-    def __init__(self, neighbors, on_status_change=None, interval_seconds=5):
-        raise NotImplementedError
+    def __init__(
+        self,
+        neighbors: list,
+        send_ping,
+        on_status_change=None,
+        interval_seconds: float = 5,
+        max_failures: int = DEFAULT_MAX_FAILURES,
+    ):
+        self.neighbors = list(neighbors)
+        self._send_ping = send_ping
+        self._on_status_change = on_status_change
+        self.interval_seconds = interval_seconds
+        self.max_failures = max_failures
 
-    def start(self):
-        raise NotImplementedError
+        self._failures = {neighbor["node_id"]: 0 for neighbor in self.neighbors}
+        self._is_up = {neighbor["node_id"]: True for neighbor in self.neighbors}
+        self._stop_event = threading.Event()
+        self._thread: threading.Thread | None = None
 
-    def stop(self):
-        raise NotImplementedError
+    def start(self) -> None:
+        self._stop_event.clear()
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
+
+    def _run(self) -> None:
+        while not self._stop_event.wait(self.interval_seconds):
+            self.check_once()
+
+    def check_once(self) -> None:
+        for neighbor in self.neighbors:
+            node_id = neighbor["node_id"]
+            try:
+                self._send_ping(neighbor)
+            except NeighborUnreachableError:
+                self._record_failure(node_id)
+            else:
+                self._record_success(node_id)
+
+    def _record_failure(self, node_id: str) -> None:
+        self._failures[node_id] += 1
+        if self._is_up[node_id] and self._failures[node_id] >= self.max_failures:
+            self._is_up[node_id] = False
+            if self._on_status_change is not None:
+                self._on_status_change(node_id, False)
+
+    def _record_success(self, node_id: str) -> None:
+        self._failures[node_id] = 0
+        if not self._is_up[node_id]:
+            self._is_up[node_id] = True
+            if self._on_status_change is not None:
+                self._on_status_change(node_id, True)
+
+    def stop(self) -> None:
+        self._stop_event.set()
