@@ -75,7 +75,7 @@ class Forwarder:
     def forward_info_packet(self, packet: dict) -> None:
         self.algorithm.handle_info_packet(packet)
         self._flush_outgoing()
-        self._sync_routing_table()
+        self.sync_routing_table()
 
     def handle_hello_packet(self, packet: dict) -> None:
         handler = getattr(self.algorithm, "handle_hello_packet", None)
@@ -84,7 +84,7 @@ class Forwarder:
         else:
             self.algorithm.handle_neighbor_up(packet.get(c.FIELD_FROM))
         self._flush_outgoing()
-        self._sync_routing_table()
+        self.sync_routing_table()
 
     def send_message(self, destination: str, payload) -> None:
         packet = build_packet(
@@ -100,11 +100,12 @@ class Forwarder:
         """Envía lo que el algoritmo tenga pendiente (p.ej. HELLOs iniciales)."""
         self._flush_outgoing()
 
-    def _flush_outgoing(self) -> None:
-        for packet in self.algorithm.get_outgoing_packets():
-            self._send_to_neighbor(packet.get(c.FIELD_TO), packet)
+    def sync_routing_table(self) -> None:
+        """Refresca RoutingTable a partir del estado actual del algoritmo.
 
-    def _sync_routing_table(self) -> None:
+        Se llama tras cada evento que puede cambiar rutas (info, hello,
+        vecino caído/recuperado desde health check).
+        """
         destinations = set(self.neighbor_addresses)
         if hasattr(self.algorithm, "routing_table"):
             destinations |= set(self.algorithm.routing_table)
@@ -115,6 +116,10 @@ class Forwarder:
             if next_hop is not None:
                 table[destination] = next_hop
         self.routing_table.update(table)
+
+    def _flush_outgoing(self) -> None:
+        for packet in self.algorithm.get_outgoing_packets():
+            self._send_to_neighbor(packet.get(c.FIELD_TO), packet)
 
     def _send_to_neighbor(self, neighbor_id: str, packet: dict) -> None:
         address = self.neighbor_addresses.get(neighbor_id)
