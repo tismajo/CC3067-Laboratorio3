@@ -1,12 +1,6 @@
 """
 Fase 3 (Infraestructura de red)
 
-Chequeo periódico de salud de los vecinos: envía un HELLO/PING a cada uno
-cada `interval_seconds`. Un envío que falla (vecino caído, timeout) cuenta
-como intento fallido; tras `max_failures` intentos fallidos consecutivos el
-vecino se marca "caído" y se notifica via `on_status_change`. Si un vecino
-caído vuelve a responder, se marca "recuperado".
-
 Es agnóstico del algoritmo de ruteo: quien conecta `on_status_change` con
 `RoutingAlgorithm.handle_neighbor_up/down` es node/main.py.
 """
@@ -75,3 +69,5 @@ class HealthChecker:
 
     def stop(self) -> None:
         self._stop_event.set()
+        if self._thread is not None:
+            self._thread.join()

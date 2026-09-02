@@ -17,8 +17,6 @@ CONNECT_TIMEOUT_SECONDS = 5
 
 
 class NeighborUnreachableError(Exception):
-    """Se lanza cuando send() no logra conectar o entregar el paquete."""
-
     def __init__(self, to_ip: str, to_port: int, cause: Exception):
         super().__init__(f"No se pudo contactar a {to_ip}:{to_port}: {cause}")
         self.to_ip = to_ip

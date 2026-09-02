@@ -1,18 +1,6 @@
 """
 Fase 3 (Infraestructura de red)
 
-Decide qué hacer con cada paquete que entra o sale del nodo.
-
-Entrantes:
-- type == "message": si soy el destino -> print; si no -> reenviar según la
-  tabla de ruteo (node/routing/routing_table.py)
-- type == "info": pasar el contenido al proceso de routing (dijkstra/flooding/lsr)
-- type == "hello": responder / usar para medir delay y descubrir vecinos
-
-Salientes:
-- Forward de mensajes de usuario (propios o reenviados)
-- Paquetes que el algoritmo activo tenga pendientes (get_outgoing_packets)
-
 `forward_data_packet` consulta RoutingTable en vez del algoritmo directamente:
 routing (que actualiza el algoritmo) y forwarding corren en hilos distintos,
 y RoutingTable es el punto de sincronización thread-safe entre ambos.
@@ -97,15 +85,9 @@ class Forwarder:
         self.forward_data_packet(packet)
 
     def send_outgoing(self) -> None:
-        """Envía lo que el algoritmo tenga pendiente (p.ej. HELLOs iniciales)."""
         self._flush_outgoing()
 
     def sync_routing_table(self) -> None:
-        """Refresca RoutingTable a partir del estado actual del algoritmo.
-
-        Se llama tras cada evento que puede cambiar rutas (info, hello,
-        vecino caído/recuperado desde health check).
-        """
         destinations = set(self.neighbor_addresses)
         if hasattr(self.algorithm, "routing_table"):
             destinations |= set(self.algorithm.routing_table)
