@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 
 from node.algorithms.dijkstra.dijkstra import (
+    DijkstraRoutingAlgorithm,
     build_routing_table,
     shortest_paths,
 )
@@ -82,6 +83,28 @@ def test_recompute_after_node_down():
     assert shortest_paths(topology, "A")["C"] == (2, "B")
     topology.mark_down("B")
     assert shortest_paths(topology, "A")["C"] == (10, "C")
+
+
+def test_algorithm_restores_neighbor_that_comes_back_up():
+    topology = Topology.from_json(
+        {
+            "nodes": ["A", "B", "C"],
+            "edges": [
+                {"node_a": "A", "node_b": "B", "weight": 1},
+                {"node_a": "B", "node_b": "C", "weight": 1},
+                {"node_a": "A", "node_b": "C", "weight": 10},
+            ],
+        }
+    )
+    algorithm = DijkstraRoutingAlgorithm(topology)
+    algorithm.initialize("A", [])
+    assert algorithm.get_next_hop("C") == "B"
+
+    algorithm.handle_neighbor_down("B")
+    assert algorithm.get_next_hop("C") == "C"
+
+    algorithm.handle_neighbor_up("B")
+    assert algorithm.get_next_hop("C") == "B"
 
 
 def test_standalone_mode(tmp_path):

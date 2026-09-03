@@ -45,34 +45,52 @@ def build_routing_table(topology: Topology, source: str) -> dict:
     }
 
 
+def _edges_of(topology: Topology) -> list:
+    """Lista de aristas ``(a, b, peso)`` sin duplicar el sentido inverso."""
+
+    seen = set()
+    edges = []
+    for node in topology.nodes:
+        for neighbor, weight in topology.get_neighbors(node):
+            key = frozenset((node, neighbor))
+            if key not in seen:
+                seen.add(key)
+                edges.append((node, neighbor, weight))
+    return edges
+
+
 class DijkstraRoutingAlgorithm(RoutingAlgorithm):
     def __init__(self, topology: Topology = None):
         self.topology = topology
         self.node_id = None
         self.paths = {}
         self.routing_table = {}
+        self._base_edges = None
+        self._down_nodes = set()
 
     def initialize(self, node_id: str, neighbors: list) -> None:
         self.node_id = node_id
-        if self.topology is None:
-            self.topology = Topology()
-            for neighbor in neighbors:
-                self.topology.add_edge(
-                    node_id,
-                    neighbor["node_id"],
-                    neighbor["weight"],
-                )
-        self._recompute()
+        if self.topology is not None:
+            self._base_edges = _edges_of(self.topology)
+        else:
+            self._base_edges = [
+                (node_id, neighbor["node_id"], neighbor["weight"])
+                for neighbor in neighbors
+            ]
+        self._down_nodes = set()
+        self._rebuild()
 
     def handle_info_packet(self, packet: dict) -> None:
         pass
 
     def handle_neighbor_up(self, node_id: str) -> None:
-        pass
+        if node_id in self._down_nodes:
+            self._down_nodes.discard(node_id)
+            self._rebuild()
 
     def handle_neighbor_down(self, node_id: str) -> None:
-        self.topology.mark_down(node_id)
-        self._recompute()
+        self._down_nodes.add(node_id)
+        self._rebuild()
 
     def get_next_hop(self, destination: str):
         return self.routing_table.get(destination)
@@ -80,7 +98,26 @@ class DijkstraRoutingAlgorithm(RoutingAlgorithm):
     def get_outgoing_packets(self) -> list:
         return []
 
+    def _rebuild(self) -> None:
+        """Reconstruye la topología desde las aristas base, sin los nodos caídos.
+
+        No se muta destructivamente: así un vecino que vuelve
+        (``handle_neighbor_up``) reaparece con todos sus enlaces.
+        """
+
+        topology = Topology()
+        for node_a, node_b, weight in self._base_edges:
+            if node_a in self._down_nodes or node_b in self._down_nodes:
+                continue
+            topology.add_edge(node_a, node_b, weight)
+        self.topology = topology
+        self._recompute()
+
     def _recompute(self) -> None:
+        if self.node_id not in self.topology.nodes:
+            self.paths = {}
+            self.routing_table = {}
+            return
         self.paths = shortest_paths(self.topology, self.node_id)
         self.routing_table = build_routing_table(
             self.topology,
