@@ -135,10 +135,22 @@ class LinkStateRouter(RoutingAlgorithm):
     def build_topology_from_lsps(self) -> Topology:
         """Arma una Topology con todos los enlaces conocidos por los LSPs."""
 
+        advertised = {
+            lsp["node_id"]: {
+                link["node_id"]: link["weight"] for link in lsp["neighbors"]
+            }
+            for lsp in self.lsp_db.values()
+        }
         topology = Topology()
-        for lsp in self.lsp_db.values():
-            for link in lsp["neighbors"]:
-                topology.add_edge(lsp["node_id"], link["node_id"], link["weight"])
+        for origin, links in advertised.items():
+            for neighbor, weight in links.items():
+                # ponytail: sin envejecimiento de LSPs. Un enlace cuenta solo si
+                # el otro extremo no lo contradice, así un nodo caído cuyo LSP
+                # viejo sigue en la BD queda aislado cuando sus vecinos publican
+                # un LSP que ya no lo incluye.
+                back = advertised.get(neighbor)
+                if back is None or origin in back:
+                    topology.add_edge(origin, neighbor, weight)
         return topology
 
     def recompute_routing_table(self) -> None:
@@ -157,9 +169,11 @@ class LinkStateRouter(RoutingAlgorithm):
 
     def handle_neighbor_up(self, node_id: str) -> None:
         self.neighbor_table.mark_up(node_id)
+        self.broadcast_own_lsp()
 
     def handle_neighbor_down(self, node_id: str) -> None:
         self.neighbor_table.mark_down(node_id)
+        self.broadcast_own_lsp()
 
     # -- consultas de forwarding ------------------------------------------
 
