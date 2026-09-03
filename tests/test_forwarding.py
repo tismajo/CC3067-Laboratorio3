@@ -129,6 +129,25 @@ def test_message_forwarded_to_next_hop_with_decremented_ttl():
     assert forwarded[c.FIELD_TO] == "C"
 
 
+def test_data_packet_is_flooded_when_algorithm_exposes_flood():
+    socket_manager = FakeSocketManager()
+    algorithm = DummyAlgorithm()
+    algorithm.flood = lambda packet, received_from: [
+        ({"node_id": "B"}, dict(packet, ttl=packet[c.FIELD_TTL] - 1)),
+        ({"node_id": "C"}, dict(packet, ttl=packet[c.FIELD_TTL] - 1)),
+    ]
+    forwarder = make_forwarder(algorithm, socket_manager=socket_manager)
+
+    packet = build_packet(
+        proto="flooding", type_=c.TYPE_MESSAGE, from_="X", to="Z", ttl=5, payload="x"
+    )
+    forwarder.forward_data_packet(packet)
+
+    assert [entry[0] for entry in socket_manager.sent] == ["127.0.0.1", "127.0.0.1"]
+    assert all(sent[2][c.FIELD_TTL] == 4 for sent in socket_manager.sent)
+    assert {sent[1] for sent in socket_manager.sent} == {5001, 5003}
+
+
 def test_send_to_unreachable_neighbor_does_not_raise():
     routing_table = RoutingTable()
     routing_table.update({"C": "B"})

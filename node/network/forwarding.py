@@ -55,6 +55,12 @@ class Forwarder:
         if packet.get(c.FIELD_TTL, 0) <= 1:
             return
 
+        flood = getattr(self.algorithm, "flood", None)
+        if flood is not None:
+            for neighbor, copy in flood(packet, packet.get(c.FIELD_FROM)):
+                self._send_to_neighbor(neighbor["node_id"], copy)
+            return
+
         next_hop = self.routing_table.get_next_hop(destination)
         if next_hop is None:
             return
