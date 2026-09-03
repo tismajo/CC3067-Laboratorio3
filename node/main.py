@@ -109,12 +109,24 @@ def _run_live(mode: str, config: dict, algorithm) -> None:
             algorithm.handle_neighbor_down(neighbor_id)
         forwarder.sync_routing_table()
 
+    def on_tick():
+        # ponytail: el re-anuncio del LSP viaja en el mismo timer del health
+        # check. Si resulta demasiado chatty, darle su propio intervalo.
+        readvertise = getattr(algorithm, "broadcast_own_lsp", None)
+        if readvertise is not None:
+            readvertise()
+            forwarder.send_outgoing()
+            forwarder.sync_routing_table()
+
     socket_manager.start_listening(on_packet_received)
     forwarder.send_outgoing()
     forwarder.sync_routing_table()
 
     health_checker = HealthChecker(
-        config["neighbors"], send_ping=send_ping, on_status_change=on_status_change
+        config["neighbors"],
+        send_ping=send_ping,
+        on_status_change=on_status_change,
+        on_tick=on_tick,
     )
     health_checker.start()
 

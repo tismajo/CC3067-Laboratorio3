@@ -56,6 +56,21 @@ def test_check_once_recovers_after_responding_again():
     assert changes == [("B", False), ("B", True)]
 
 
+def test_on_tick_runs_once_per_loop_iteration():
+    ticks = []
+    checker = HealthChecker(
+        [{"node_id": "B"}],
+        send_ping=lambda neighbor: None,
+        interval_seconds=0.02,
+        on_tick=lambda: ticks.append(1),
+    )
+    checker.start()
+    threading.Event().wait(0.1)
+    checker.stop()
+
+    assert len(ticks) >= 1
+
+
 def test_start_runs_checks_periodically_until_stopped():
     ping = ScriptedPing()
     checker = HealthChecker(

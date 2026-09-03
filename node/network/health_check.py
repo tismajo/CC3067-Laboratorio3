@@ -22,10 +22,12 @@ class HealthChecker:
         on_status_change=None,
         interval_seconds: float = 5,
         max_failures: int = DEFAULT_MAX_FAILURES,
+        on_tick=None,
     ):
         self.neighbors = list(neighbors)
         self._send_ping = send_ping
         self._on_status_change = on_status_change
+        self._on_tick = on_tick
         self.interval_seconds = interval_seconds
         self.max_failures = max_failures
 
@@ -42,6 +44,8 @@ class HealthChecker:
     def _run(self) -> None:
         while not self._stop_event.wait(self.interval_seconds):
             self.check_once()
+            if self._on_tick is not None:
+                self._on_tick()
 
     def check_once(self) -> None:
         for neighbor in self.neighbors:
