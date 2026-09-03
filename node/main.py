@@ -131,13 +131,24 @@ def _run_live(mode: str, config: dict, algorithm) -> None:
     health_checker.start()
 
     print(f"[{node_id}] escuchando en {config['ip']}:{config['port']} (modo {mode})")
-    print("escribe 'destino: mensaje' y Enter para enviar; Ctrl+C para salir")
+    print("escribe 'destino: mensaje' para enviar, 'tabla' para ver rutas, Ctrl+C para salir")
     try:
         for line in sys.stdin:
-            destination, separator, payload = line.rstrip("\n").partition(":")
+            line = line.rstrip("\n").strip()
+            if line == "tabla":
+                snapshot = routing_table.snapshot()
+                if not snapshot:
+                    print(f"[{node_id}] tabla de ruteo vacía todavía")
+                    continue
+                print(f"[{node_id}] tabla de ruteo:")
+                for destination in sorted(snapshot):
+                    print(f"  {destination}\t{snapshot[destination]}")
+                continue
+
+            destination, separator, payload = line.partition(":")
             destination, payload = destination.strip(), payload.strip()
             if not separator or not destination or not payload:
-                print("formato esperado: destino: mensaje")
+                print("formato esperado: destino: mensaje  (o 'tabla' para ver rutas)")
                 continue
             forwarder.send_message(destination, payload)
     except KeyboardInterrupt:
