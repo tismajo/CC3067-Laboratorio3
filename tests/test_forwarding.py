@@ -3,14 +3,18 @@ from shared.interfaces import RoutingAlgorithm
 from shared.protocol import build_packet, serialize
 
 from node.network.forwarding import Forwarder
+from node.network.socket_manager import NeighborUnreachableError
 from node.routing.routing_table import RoutingTable
 
 
 class FakeSocketManager:
-    def __init__(self):
+    def __init__(self, unreachable=False):
         self.sent = []
+        self._unreachable = unreachable
 
     def send(self, to_ip, to_port, packet):
+        if self._unreachable:
+            raise NeighborUnreachableError(to_ip, to_port, OSError("connection refused"))
         self.sent.append((to_ip, to_port, packet))
 
 
@@ -123,6 +127,21 @@ def test_message_forwarded_to_next_hop_with_decremented_ttl():
     assert (to_ip, to_port) == ("127.0.0.1", 5001)
     assert forwarded[c.FIELD_TTL] == 4
     assert forwarded[c.FIELD_TO] == "C"
+
+
+def test_send_to_unreachable_neighbor_does_not_raise():
+    routing_table = RoutingTable()
+    routing_table.update({"C": "B"})
+    forwarder = make_forwarder(
+        DummyAlgorithm(),
+        routing_table=routing_table,
+        socket_manager=FakeSocketManager(unreachable=True),
+    )
+
+    packet = build_packet(
+        proto="dijkstra", type_=c.TYPE_MESSAGE, from_="A", to="C", ttl=5, payload="x"
+    )
+    forwarder.forward_data_packet(packet)  # no debe propagar NeighborUnreachableError
 
 
 def test_send_message_originates_packet_from_self():

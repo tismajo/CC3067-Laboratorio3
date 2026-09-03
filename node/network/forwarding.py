@@ -8,6 +8,7 @@ y RoutingTable es el punto de sincronización thread-safe entre ambos.
 
 from __future__ import annotations
 
+from node.network.socket_manager import NeighborUnreachableError
 from node.routing.routing_table import RoutingTable
 from shared import constants as c
 from shared.protocol import build_packet, decrement_ttl, deserialize
@@ -107,4 +108,9 @@ class Forwarder:
         address = self.neighbor_addresses.get(neighbor_id)
         if address is None:
             return
-        self.socket_manager.send(address["ip"], address["port"], packet)
+        try:
+            self.socket_manager.send(address["ip"], address["port"], packet)
+        except NeighborUnreachableError:
+            # Un vecino que todavía no escucha (arranque) o que se acaba de caer
+            # no debe tumbar el nodo: el health check ya lo detecta y reintenta.
+            pass
