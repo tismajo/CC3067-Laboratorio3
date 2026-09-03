@@ -28,4 +28,4 @@
 - [x] Uso del módulo de Dijkstra (ya terminado por MJ) para calcular tablas, sin modificarlo
 - [x] Lógica de actualización de tablas al recibir nuevos LSPs
 - [x] Modo standalone "lsr"
-- [ ] Su parte del reporte: descripción de Link State Routing y de su implementación, encabezado, ortografía y formato general del documento
+- [x] Su parte del reporte: descripción de Link State Routing y de su implementación, encabezado, ortografía y formato general del documento
