@@ -3,6 +3,7 @@
 import json
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -81,6 +82,14 @@ def test_initial_routing_table_covers_direct_neighbors():
 
     assert router.routing_table == {"B": "B", "I": "I"}
     assert router.get_next_hop("B") == "B"
+
+
+def test_own_lsp_sequence_is_seeded_from_the_clock():
+    before = int(time.time())
+    router = make_router()
+    # Un contador arrancaría en 1; sembrar desde el reloj hace que un nodo
+    # reiniciado siga ganando la comparación is_newer contra sus vecinos.
+    assert router.lsp_db["A"]["sequence"] >= before
 
 
 def test_topology_rebuilt_on_new_lsp():
@@ -172,7 +181,7 @@ def test_standalone_lsr_mode(tmp_path):
         text=True,
     )
 
-    assert "LSP de A (seq 1)" in result.stdout
+    assert "LSP de A (seq " in result.stdout
     assert "Rutas desde A" in result.stdout
     assert "B\tB" in result.stdout
     assert "I\tI" in result.stdout

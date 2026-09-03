@@ -18,6 +18,7 @@ Orquesta el algoritmo completo de LSR:
 from __future__ import annotations
 
 import threading
+import time
 
 from node.algorithms.flooding.flooding import (
     decrement_ttl,
@@ -56,6 +57,9 @@ class LinkStateRouter(RoutingAlgorithm):
     def initialize(self, node_id: str, neighbors: list) -> None:
         self.node_id = node_id
         self.self_info["node_id"] = node_id
+        # La secuencia arranca desde el reloj: si el nodo reinicia, sus LSPs
+        # nuevos siguen siendo "más nuevos" que los que los vecinos guardaron.
+        self.sequence = int(time.time())
         self.neighbor_table = NeighborTable(
             neighbors,
             timeout=self.neighbor_table.timeout,
