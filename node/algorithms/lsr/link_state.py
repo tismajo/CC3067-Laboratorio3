@@ -23,7 +23,6 @@ import time
 from node.algorithms.flooding.flooding import (
     decrement_ttl,
     get_forward_targets,
-    should_forward,
 )
 from node.algorithms.flooding.neighbor_discovery import NeighborTable
 from node.algorithms.dijkstra.dijkstra import build_routing_table
@@ -47,7 +46,6 @@ class LinkStateRouter(RoutingAlgorithm):
         self.neighbor_table = NeighborTable(timeout=neighbor_timeout)
         self.sequence = 0
         self.lsp_db: dict[str, dict] = {}
-        self.seen_packet_ids: set[str] = set()
         self.routing_table: dict[str, str] = {}
         self._outgoing: list[dict] = []
         self._lock = threading.RLock()
@@ -70,7 +68,6 @@ class LinkStateRouter(RoutingAlgorithm):
             self.neighbor_table.mark_up(neighbor["node_id"])
 
         with self._lock:
-            self.seen_packet_ids.clear()
             self._outgoing = self.neighbor_table.build_hello_packets(self.self_info)
         self.broadcast_own_lsp()
 
@@ -90,7 +87,6 @@ class LinkStateRouter(RoutingAlgorithm):
             self.recompute_routing_table()
 
             packet_id = f"{self.node_id}-{self.sequence}"
-            self.seen_packet_ids.add(packet_id)
             for neighbor in self.neighbor_table.get_active_neighbors():
                 self._outgoing.append(
                     build_packet(
@@ -104,14 +100,20 @@ class LinkStateRouter(RoutingAlgorithm):
                 )
 
     def handle_info_packet(self, packet: dict) -> None:
-        """Procesa un LSP recibido y lo reenvía al resto de la red."""
+        """Procesa un LSP recibido y lo reenvía si aportó información nueva."""
 
         lsp = parse_lsp(packet.get(c.FIELD_PAYLOAD))
-        self.on_lsp_received(lsp)
+        # lsp_db + is_newer ya deduplican por (origen, secuencia): un LSP viejo
+        # o repetido devuelve False y no se reenvía. No hace falta un set de
+        # packet_ids que crezca sin límite.
+        if not self.on_lsp_received(lsp):
+            return
+
+        ttl = packet.get(c.FIELD_TTL)
+        if not isinstance(ttl, int) or isinstance(ttl, bool) or ttl <= 1:
+            return
 
         with self._lock:
-            if not should_forward(packet, self.seen_packet_ids):
-                return
             targets = get_forward_targets(
                 packet,
                 self.neighbor_table,
