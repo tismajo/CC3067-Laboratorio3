@@ -168,6 +168,20 @@ def test_flood_prepares_one_copy_per_target_and_tracks_duplicate():
     assert algorithm.flood(packet, received_from="A") == []
 
 
+def test_handle_info_packet_queues_one_copy_per_neighbor():
+    algorithm = FloodingRoutingAlgorithm()
+    algorithm.initialize("B", [{"node_id": "A"}, {"node_id": "C"}, {"node_id": "D"}])
+    algorithm.get_outgoing_packets()
+    for node_id in ("A", "C", "D"):
+        algorithm.handle_neighbor_up(node_id)
+
+    algorithm.handle_info_packet(make_packet(ttl=4, packet_id="lsp-1"))
+
+    queued = algorithm.get_outgoing_packets()
+    assert sorted(packet[c.FIELD_TO] for packet in queued) == ["C", "D"]
+    assert all(packet[c.FIELD_TTL] == 3 for packet in queued)
+
+
 def test_routing_algorithm_neighbor_events_and_initial_hello_queue():
     algorithm = FloodingRoutingAlgorithm()
     algorithm.initialize("A", [{"node_id": "B"}, {"node_id": "C"}])

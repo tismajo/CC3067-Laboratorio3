@@ -147,12 +147,16 @@ class FloodingRoutingAlgorithm(RoutingAlgorithm):
             return [(target, dict(forwarded)) for target in targets]
 
     def handle_info_packet(self, packet: dict) -> None:
-        """Acepta INFO para cumplir la interfaz y agenda su reenvío."""
+        """Acepta INFO para cumplir la interfaz y agenda una copia por vecino."""
 
         transmissions = self.flood(packet, packet.get(c.FIELD_FROM))
-        if transmissions:
-            with self._lock:
-                self._outgoing_packets.append(transmissions[0][1])
+        if not transmissions:
+            return
+        with self._lock:
+            for neighbor, copy in transmissions:
+                routed = dict(copy)
+                routed[c.FIELD_TO] = neighbor["node_id"]
+                self._outgoing_packets.append(routed)
 
     def handle_neighbor_up(self, node_id: str) -> None:
         self.neighbor_table.mark_up(node_id)
