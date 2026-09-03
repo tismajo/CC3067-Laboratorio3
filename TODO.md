@@ -23,9 +23,9 @@
 - [x] Su parte del reporte: descripción de la arquitectura de red (sockets, hilos, protocolo)
 
 ## Fase 4 Link State Routing (una vez existan Dijkstra y Flooding)
-- [ ] Formato del LSP (Link State Packet) dentro del `payload`
-- [ ] Uso del módulo de Flooding (ya terminado por LDM) para inundar LSPs, sin modificarlo
-- [ ] Uso del módulo de Dijkstra (ya terminado por MJ) para calcular tablas, sin modificarlo
-- [ ] Lógica de actualización de tablas al recibir nuevos LSPs
-- [ ] Modo standalone "lsr"
+- [x] Formato del LSP (Link State Packet) dentro del `payload`
+- [x] Uso del módulo de Flooding (ya terminado por LDM) para inundar LSPs, sin modificarlo
+- [x] Uso del módulo de Dijkstra (ya terminado por MJ) para calcular tablas, sin modificarlo
+- [x] Lógica de actualización de tablas al recibir nuevos LSPs
+- [x] Modo standalone "lsr"
 - [ ] Su parte del reporte: descripción de Link State Routing y de su implementación, encabezado, ortografía y formato general del documento

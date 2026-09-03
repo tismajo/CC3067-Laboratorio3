@@ -6,6 +6,7 @@ from pathlib import Path
 from node.algorithms.dijkstra.dijkstra import DijkstraRoutingAlgorithm
 from node.algorithms.dijkstra.topology import Topology
 from node.algorithms.flooding.flooding import FloodingRoutingAlgorithm
+from node.algorithms.lsr.link_state import LinkStateRouter
 from node.network.forwarding import Forwarder
 from node.network.health_check import HealthChecker
 from node.network.socket_manager import SocketManager
@@ -17,6 +18,8 @@ from shared.protocol import build_packet
 def _build_algorithm(mode: str, config: dict):
     if mode == "flooding":
         algorithm = FloodingRoutingAlgorithm(self_info=config)
+    elif mode == "lsr":
+        algorithm = LinkStateRouter(self_info=config)
     else:
         algorithm = DijkstraRoutingAlgorithm(Topology.from_json(config))
     algorithm.initialize(config["node_id"], config["neighbors"])
@@ -34,6 +37,17 @@ def _print_standalone_summary(mode: str, config: dict, algorithm) -> None:
             )
         )
         print(f"HELLO pendientes: {len(algorithm.get_outgoing_packets())}")
+        return
+
+    if mode == "lsr":
+        own_lsp = algorithm.lsp_db.get(config["node_id"], {})
+        print(f"LSP de {config['node_id']} (seq {own_lsp.get('sequence')})")
+        for link in own_lsp.get("neighbors", []):
+            print(f"{link['node_id']}\t{link['weight']:g}")
+        print(f"Rutas desde {config['node_id']}")
+        print("destino\tsiguiente salto")
+        for destination in sorted(algorithm.routing_table):
+            print(f"{destination}\t{algorithm.routing_table[destination]}")
         return
 
     print(f"Rutas desde {config['node_id']}")
@@ -126,9 +140,6 @@ def main():
         help="arranca sockets reales y un modo interactivo en vez del resumen estático",
     )
     args = parser.parse_args()
-
-    if args.mode == "lsr":
-        parser.error(f"el modo {args.mode} todavía no está implementado")
 
     config = json.loads(Path(args.config).read_text(encoding="utf-8"))
     algorithm = _build_algorithm(args.mode, config)

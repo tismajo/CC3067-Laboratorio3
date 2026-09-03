@@ -1,6 +1,13 @@
 """Fase 4: pruebas unitarias de node/algorithms/lsr/*"""
 
+import json
+import subprocess
+import sys
+from pathlib import Path
+
 import pytest
+
+ROOT = Path(__file__).parents[1]
 
 from node.algorithms.lsr.link_state import LinkStateRouter
 from node.algorithms.lsr.lsp import build_lsp, is_newer, parse_lsp
@@ -138,3 +145,34 @@ def test_neighbor_down_readvertises_and_reroutes():
     assert [link["node_id"] for link in own_lsp["neighbors"]] == ["B"]
     assert router.routing_table["C"] == "B"
     assert any(p[c.FIELD_TYPE] == c.TYPE_INFO for p in router.get_outgoing_packets())
+
+
+def test_standalone_lsr_mode(tmp_path):
+    config_path = tmp_path / "topology.json"
+    config_path.write_text(
+        json.dumps(
+            {
+                "node_id": "A",
+                "ip": "127.0.0.1",
+                "port": 5000,
+                "neighbors": [
+                    {"node_id": "B", "ip": "127.0.0.1", "port": 5001, "weight": 7},
+                    {"node_id": "I", "ip": "127.0.0.1", "port": 5002, "weight": 1},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [sys.executable, "-m", "node.main", "--config", str(config_path), "--mode", "lsr"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert "LSP de A (seq 1)" in result.stdout
+    assert "Rutas desde A" in result.stdout
+    assert "B\tB" in result.stdout
+    assert "I\tI" in result.stdout
