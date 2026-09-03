@@ -25,6 +25,8 @@ from node.algorithms.flooding.flooding import (
     should_forward,
 )
 from node.algorithms.flooding.neighbor_discovery import NeighborTable
+from node.algorithms.dijkstra.dijkstra import build_routing_table
+from node.algorithms.dijkstra.topology import Topology
 from node.algorithms.lsr.lsp import build_lsp, is_newer, parse_lsp
 from shared import constants as c
 from shared.interfaces import RoutingAlgorithm
@@ -130,11 +132,23 @@ class LinkStateRouter(RoutingAlgorithm):
 
     # -- topología derivada y tabla de ruteo ---------------------------------
 
-    def build_topology_from_lsps(self):
-        return None
+    def build_topology_from_lsps(self) -> Topology:
+        """Arma una Topology con todos los enlaces conocidos por los LSPs."""
+
+        topology = Topology()
+        for lsp in self.lsp_db.values():
+            for link in lsp["neighbors"]:
+                topology.add_edge(lsp["node_id"], link["node_id"], link["weight"])
+        return topology
 
     def recompute_routing_table(self) -> None:
-        pass
+        """Corre Dijkstra sobre la topología derivada de los LSPs."""
+
+        topology = self.build_topology_from_lsps()
+        if self.node_id in topology.nodes:
+            self.routing_table = build_routing_table(topology, self.node_id)
+        else:
+            self.routing_table = {}
 
     # -- eventos de vecinos -------------------------------------------------
 
