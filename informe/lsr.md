@@ -36,33 +36,38 @@ El LSP viaja en el campo `payload` de un paquete con `proto="lsr"` y `type="info
 }
 ```
 
-`node_id` es el nodo que originó el LSP y `sequence` es un contador que crece cada
-vez que ese nodo detecta un cambio en sus enlaces. `build_lsp` arma el payload,
-`parse_lsp` valida un LSP recibido y devuelve una copia normalizada, e `is_newer`
-compara secuencias para decidir si un LSP reemplaza al que ya se tenía guardado.
+`node_id` es el nodo que originó el LSP y `sequence` distingue las versiones de su
+información de enlaces. Se siembra con el reloj (`int(time.time())`) al arrancar y
+crece con cada cambio, de modo que un nodo que reinicia sigue emitiendo LSPs "más
+nuevos" que los que sus vecinos guardaron. `build_lsp` arma el payload, `parse_lsp`
+valida un LSP recibido y devuelve una copia normalizada, e `is_newer` compara
+secuencias para decidir si un LSP reemplaza al que ya se tenía guardado.
 
-El `packet_id` de los encabezados vale `"<origen>-<secuencia>"`. Esto permite que
-la detección de duplicados de Flooding reconozca el mismo LSP en cualquier salto y
-corte la inundación cuando ya circuló por toda la red.
+El encabezado lleva un `packet_id` con valor `"<origen>-<secuencia>"` para poder
+identificar cada LSP en logs y en la infraestructura.
 
 ## Distribución por flooding
 
 `LinkStateRouter.broadcast_own_lsp` incrementa la secuencia, arma el LSP con los
 vecinos activos según `NeighborTable`, lo guarda en la base local (`lsp_db`),
-recalcula las rutas y encola una copia del paquete para cada vecino activo.
+recalcula las rutas y encola una copia del paquete para cada vecino activo. El
+nodo también re-anuncia su LSP periódicamente (sobre el temporizador del health
+check) para recuperar LSPs perdidos en la red.
 
 `handle_info_packet` procesa un LSP entrante en dos pasos:
 
 1. `parse_lsp` y `on_lsp_received`: si el LSP es más nuevo que el guardado, se
-   almacena y se dispara el recálculo; si es viejo o repetido, se descarta.
-2. Reenvío: se aplica `should_forward` (control de TTL y duplicados) y
-   `get_forward_targets`, que devuelve los vecinos activos excepto el que entregó
-   el paquete. Cada copia sale con el TTL decrementado, el campo `from` puesto al
-   nodo actual —el último salto— y el `to` al vecino destino. El originador real
-   se conserva dentro de `payload.node_id`.
+   almacena y se dispara el recálculo; si es viejo o repetido, `on_lsp_received`
+   devuelve `False` y el LSP no se propaga. La deduplicación se apoya en `lsp_db`
+   + `is_newer` (por `(origen, secuencia)`), sin un conjunto que crezca sin límite.
+2. Reenvío: si el LSP aportó información nueva y su TTL lo permite, se usa
+   `get_forward_targets` —vecinos activos excepto el que entregó el paquete— y cada
+   copia sale con el TTL decrementado (`decrement_ttl` de Flooding), el campo
+   `from` puesto al nodo actual —el último salto— y el `to` al vecino destino. El
+   originador real se conserva dentro de `payload.node_id`.
 
-El módulo de Flooding se usa tal como quedó; LSR solo aporta el `packet_id` y la
-lógica de cuándo un LSP amerita reenvío.
+El módulo de Flooding se usa tal como quedó; LSR solo decide cuándo un LSP amerita
+reenvío.
 
 ## Topología derivada y tabla de ruteo
 
@@ -95,7 +100,7 @@ Sin sockets, el nodo solo conoce sus propios enlaces, así que imprime su LSP y 
 tabla de ruteo derivada de él (los vecinos directos):
 
 ```text
-LSP de A (seq 1)
+LSP de A (seq 1788415869)
 B	7
 I	1
 C	7
@@ -106,16 +111,21 @@ C	C
 I	I
 ```
 
-Con `--live` se arma la infraestructura de la Fase 3 (`SocketManager`, `Forwarder`,
-`HealthChecker`): los LSPs se propagan por la red real, la topología se completa a
-medida que llegan y la tabla converge al camino de menor costo.
+La secuencia es un timestamp, por eso no arranca en 1. Con `--live` se arma la
+infraestructura de la Fase 3 (`SocketManager`, `Forwarder`, `HealthChecker`): los
+LSPs se propagan por la red real, la topología se completa a medida que llegan y la
+tabla converge al camino de menor costo. Se probó con tres nodos `A—B—C`: un
+mensaje de `A` a `C` viaja por `B`, y al detenerse `B` el health check lo detecta,
+`A` re-anuncia su LSP y la ruta se recalcula al enlace directo `A—C`.
 
 ## Pruebas
 
 Las pruebas cubren la construcción y lectura del LSP, la comparación por secuencia,
-la reconstrucción de la topología al llegar un LSP nuevo, el recálculo de la tabla,
-el descarte de LSPs viejos, el reenvío sin duplicados y excluyendo al emisor, el
-reanuncio y reruteo cuando cae un vecino, y la ejecución del modo standalone.
+la siembra de la secuencia desde el reloj, la reconstrucción de la topología al
+llegar un LSP nuevo, el recálculo de la tabla, el descarte de LSPs viejos, el
+reenvío sin duplicados y excluyendo al emisor, el reanuncio y reruteo cuando cae un
+vecino, y la ejecución del modo standalone. `tests/test_integration_live.py` levanta
+tres nodos reales y verifica la entrega multi-salto.
 
 ```bash
 python -m pytest tests/test_lsr.py -q

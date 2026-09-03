@@ -58,7 +58,9 @@ Con una cola de prioridad, el tiempo de ejecución es `O((V + E) log V)`, donde 
 
 ## Modelo de topología
 
-La clase `Topology` guarda una lista de adyacencia no dirigida. `add_edge` registra el enlace en ambos sentidos y `get_neighbors` devuelve los vecinos con sus pesos. `mark_down` elimina un nodo y todas sus conexiones, lo que permite recalcular las rutas después de una caída.
+La clase `Topology` guarda una lista de adyacencia no dirigida. `add_edge` registra el enlace en ambos sentidos y `get_neighbors` devuelve los vecinos con sus pesos.
+
+`DijkstraRoutingAlgorithm` guarda la lista de aristas base y un conjunto de nodos caídos. Ante `handle_neighbor_down` agrega el nodo al conjunto y ante `handle_neighbor_up` lo quita; en ambos casos reconstruye la topología desde las aristas base omitiendo los caídos y vuelve a correr Dijkstra. Al no mutar la topología de forma destructiva, un vecino que se recupera reaparece con todos sus enlaces.
 
 `Topology.from_json` acepta una sección con este formato:
 
@@ -163,7 +165,7 @@ El modo standalone carga únicamente el nodo y sus vecinos desde la configuraci�
 python -m node.main --config shared/config/topology_example.json --mode flooding
 ```
 
-Este modo valida el arranque, la lectura de vecinos y la generación de descubrimiento sin transmitir por la red. Con `--live`, los paquetes pendientes se entregan al proceso de forwarding y se envían por sockets reales.
+Este modo valida el arranque, la lectura de vecinos y la generación de descubrimiento sin transmitir por la red. Con `--live`, los paquetes pendientes se entregan al proceso de forwarding y se envían por sockets reales; un mensaje de usuario se inunda salto a salto hasta su destino. Se probó con tres nodos `A—B—C`: un mensaje de `A` a `C` (sin enlace directo) llega inundado a través de `B`.
 
 ## Pruebas
 
@@ -184,13 +186,13 @@ Dijkstra y Flooding calculan rutas o deciden reenvíos, pero ninguno abre un soc
 `node/network/socket_manager.py` usa TCP con un patrón de un paquete por conexión: `connect` → enviar el JSON serializado (`shared/protocol.serialize`) → cerrar. No se mantienen conexiones persistentes entre nodos.
 
 - `start_listening(on_packet_received)` abre un socket servidor en un hilo daemon. Cada conexión aceptada se atiende en su propio hilo, que lee hasta que el emisor cierra la conexión y entrega el contenido crudo al callback.
-- `send(to_ip, to_port, packet)` abre una conexión con timeout, envía y cierra. Si el vecino no responde (caído, timeout, puerto cerrado), la excepción de socket se traduce a `NeighborUnreachableError`, para que el resto del sistema no dependa de excepciones crudas de `socket`.
+- `send(to_ip, to_port, packet)` abre una conexión con timeout, envía y cierra. Si el vecino no responde (caído, timeout, puerto cerrado), la excepción de socket se traduce a `NeighborUnreachableError`, para que el resto del sistema no dependa de excepciones crudas de `socket`. `Forwarder._send_to_neighbor` la atrapa: un vecino que todavía no arranca o que se acaba de caer no debe tumbar el nodo; el health check ya lo detecta y reintenta.
 
 ## Forwarding
 
 `node/network/forwarding.py` define la clase `Forwarder`, que junta al algoritmo activo, la tabla de ruteo compartida, el `SocketManager` y el mapa de direcciones de los vecinos configurados. `handle_incoming_packet` despacha cada paquete según `type`:
 
-- **message**: si el destino es este nodo, se imprime; si no, se busca el siguiente salto en `RoutingTable` y se reenvía con el TTL decrementado (`shared.protocol.decrement_ttl`). Un TTL agotado o un destino sin ruta conocida se descartan silenciosamente.
+- **message**: si el destino es este nodo, se imprime. Si no y el algoritmo expone `flood` (Flooding), se envía una copia por cada vecino activo salvo el emisor. En caso contrario se busca un único siguiente salto en `RoutingTable` (Dijkstra, LSR). En ambos caminos el TTL se decrementa y un TTL agotado o un destino sin ruta conocida se descartan silenciosamente.
 - **info**: se delega en `algorithm.handle_info_packet`, que es el único método de la interfaz pensado para que cada algoritmo actualice su estado interno (LSP, vector de distancias, etc.).
 - **hello**: si el algoritmo expone `handle_hello_packet` (como Flooding y LSR) se usa; si no, se cae a `algorithm.handle_neighbor_up`, que sí es parte del contrato común.
 
@@ -202,7 +204,7 @@ Después de procesar un `info` o un `hello`, `Forwarder` reenvía lo que el algo
 
 ## Health check
 
-`node/network/health_check.py` define `HealthChecker`, que cada `interval_seconds` intenta enviar un HELLO a cada vecino configurado. Un envío que falla (`NeighborUnreachableError`) cuenta como intento fallido; tras `max_failures` fallos consecutivos el vecino se marca caído y se notifica vía `on_status_change`. Si un vecino caído vuelve a responder, se notifica la recuperación.
+`node/network/health_check.py` define `HealthChecker`, que cada `interval_seconds` intenta enviar un HELLO a cada vecino configurado. El HELLO lleva en su payload `node_id`, `ip`, `port` y `sent_at`, de modo que el receptor (`NeighborTable.on_hello_received`) puede estimar el retardo del enlace. Un envío que falla (`NeighborUnreachableError`) cuenta como intento fallido; tras `max_failures` fallos consecutivos el vecino se marca caído y se notifica vía `on_status_change`. Si un vecino caído vuelve a responder, se notifica la recuperación. Un callback opcional `on_tick` se ejecuta una vez por ciclo; `node/main.py` lo usa para el re-anuncio periódico del LSP en modo LSR.
 
 `HealthChecker` es agnóstico del algoritmo de ruteo: en `node/main.py`, `on_status_change` es quien llama `algorithm.handle_neighbor_up`/`handle_neighbor_down` y dispara `forwarder.sync_routing_table()`.
 
@@ -255,20 +257,20 @@ El LSP viaja en el campo `payload` de un paquete con `proto="lsr"` y `type="info
 }
 ```
 
-`node_id` es el nodo que originó el LSP y `sequence` es un contador que crece cada vez que ese nodo detecta un cambio en sus enlaces. `build_lsp` arma el payload, `parse_lsp` valida un LSP recibido y devuelve una copia normalizada, e `is_newer` compara secuencias para decidir si un LSP reemplaza al que ya se tenía guardado.
+`node_id` es el nodo que originó el LSP y `sequence` distingue las versiones de su información de enlaces. Se siembra con el reloj (`int(time.time())`) al arrancar y crece con cada cambio, de modo que un nodo que reinicia sigue emitiendo LSPs "más nuevos" que los que sus vecinos guardaron. `build_lsp` arma el payload, `parse_lsp` valida un LSP recibido y devuelve una copia normalizada, e `is_newer` compara secuencias para decidir si un LSP reemplaza al que ya se tenía guardado.
 
-El `packet_id` de los encabezados vale `"<origen>-<secuencia>"`. Esto permite que la detección de duplicados de Flooding reconozca el mismo LSP en cualquier salto y corte la inundación cuando ya circuló por toda la red.
+El encabezado lleva un `packet_id` con valor `"<origen>-<secuencia>"` para que los logs y la infraestructura puedan identificar cada LSP.
 
 ## Distribución por flooding
 
-`LinkStateRouter.broadcast_own_lsp` incrementa la secuencia, arma el LSP con los vecinos activos según `NeighborTable`, lo guarda en la base local (`lsp_db`), recalcula las rutas y encola una copia del paquete para cada vecino activo.
+`LinkStateRouter.broadcast_own_lsp` incrementa la secuencia, arma el LSP con los vecinos activos según `NeighborTable`, lo guarda en la base local (`lsp_db`), recalcula las rutas y encola una copia del paquete para cada vecino activo. Además de anunciarse ante un cambio, el nodo re-anuncia su LSP periódicamente (sobre el mismo temporizador del health check) para recuperar LSPs perdidos en la red.
 
 `handle_info_packet` procesa un LSP entrante en dos pasos:
 
-1. `parse_lsp` y `on_lsp_received`: si el LSP es más nuevo que el guardado, se almacena y se dispara el recálculo; si es viejo o repetido, se descarta.
-2. Reenvío: se aplica `should_forward` (control de TTL y duplicados) y `get_forward_targets`, que devuelve los vecinos activos excepto el que entregó el paquete. Cada copia sale con el TTL decrementado, el campo `from` puesto al nodo actual —el último salto— y el `to` al vecino destino. El originador real se conserva dentro de `payload.node_id`.
+1. `parse_lsp` y `on_lsp_received`: si el LSP es más nuevo que el guardado, se almacena y se dispara el recálculo; si es viejo o repetido, `on_lsp_received` devuelve `False` y el LSP no se propaga. La deduplicación se apoya en `lsp_db` + `is_newer` (por `(origen, secuencia)`), sin un conjunto de identificadores que crezca sin límite.
+2. Reenvío: si el LSP aportó información nueva y su TTL lo permite, se usa `get_forward_targets` —vecinos activos excepto el que entregó el paquete— y cada copia sale con el TTL decrementado (`decrement_ttl` de Flooding), el campo `from` puesto al nodo actual —el último salto— y el `to` al vecino destino. El originador real se conserva dentro de `payload.node_id`.
 
-El módulo de Flooding se usa tal como quedó; LSR solo aporta el `packet_id` y la lógica de cuándo un LSP amerita reenvío.
+El módulo de Flooding se usa tal como quedó; LSR solo decide cuándo un LSP amerita reenvío.
 
 ## Topología derivada y tabla de ruteo
 
@@ -290,7 +292,7 @@ python -m node.main --config shared/config/topology_example.json --mode lsr
 Sin sockets, el nodo solo conoce sus propios enlaces, así que imprime su LSP y la tabla de ruteo derivada de él (los vecinos directos):
 
 ```text
-LSP de A (seq 1)
+LSP de A (seq 1788415869)
 B	7
 I	1
 C	7
@@ -301,7 +303,7 @@ C	C
 I	I
 ```
 
-Con `--live` se arma la infraestructura de la Fase 3 (`SocketManager`, `Forwarder`, `HealthChecker`): los LSPs se propagan por la red real, la topología se completa a medida que llegan y la tabla converge al camino de menor costo.
+La secuencia es un timestamp, por eso no arranca en 1. Con `--live` se arma la infraestructura de la Fase 3 (`SocketManager`, `Forwarder`, `HealthChecker`): los LSPs se propagan por la red real, la topología se completa a medida que llegan y la tabla converge al camino de menor costo. Se probó con tres nodos `A—B—C`: un mensaje de `A` a `C` viaja por `B`, y al detenerse `B` el health check lo detecta, `A` re-anuncia su LSP y la ruta se recalcula al enlace directo `A—C`.
 
 ## Pruebas
 
