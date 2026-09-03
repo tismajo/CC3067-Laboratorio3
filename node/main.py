@@ -1,6 +1,7 @@
 import argparse
 import json
 import sys
+import time
 from pathlib import Path
 
 from node.algorithms.dijkstra.dijkstra import DijkstraRoutingAlgorithm
@@ -89,7 +90,15 @@ def _run_live(mode: str, config: dict, algorithm) -> None:
             type_=c.TYPE_HELLO,
             from_=node_id,
             to=neighbor["node_id"],
-            payload={"ip": config["ip"], "port": config["port"]},
+            ttl=1,
+            payload={
+                "node_id": node_id,
+                "ip": config["ip"],
+                "port": config["port"],
+                # sent_at deja que el receptor calcule el retardo del enlace
+                # (NeighborTable.on_hello_received).
+                "sent_at": time.time(),
+            },
         )
         socket_manager.send(neighbor["ip"], neighbor["port"], packet)
 
