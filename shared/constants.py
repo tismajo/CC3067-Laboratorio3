@@ -28,6 +28,7 @@ def _load_schema() -> dict:
 
 def _apply(schema: dict, module_globals: dict) -> None:
     fields = schema["field_names"]
+    module_globals["FIELD_VERSION"] = fields["version"]
     module_globals["FIELD_PROTO"] = fields["proto"]
     module_globals["FIELD_TYPE"] = fields["type"]
     module_globals["FIELD_FROM"] = fields["from"]
@@ -43,10 +44,12 @@ def _apply(schema: dict, module_globals: dict) -> None:
 
     types_ = schema["type_values"]
     module_globals["TYPE_HELLO"] = types_["HELLO"]
+    module_globals["TYPE_ECHO"] = types_["ECHO"]
     module_globals["TYPE_MESSAGE"] = types_["MESSAGE"]
     module_globals["TYPE_INFO"] = types_["INFO"]
 
     module_globals["DEFAULT_TTL"] = schema["defaults"]["ttl"]
+    module_globals["HELLO_TTL"] = schema["defaults"]["hello_ttl"]
     module_globals["REQUIRED_FIELD_KEYS"] = schema["required_fields"]
     module_globals["_SCHEMA"] = schema
 

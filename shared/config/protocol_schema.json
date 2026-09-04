@@ -2,6 +2,7 @@
   "_comment": "Editar SOLO este archivo si el dia de la prueba hay que renombrar campos, agregar un nuevo 'type'/'proto', o cambiar el TTL por defecto. Nadie debe hardcodear estos strings en el codigo: siempre usar shared/constants.py.",
 
   "field_names": {
+    "version": "version",
     "proto": "proto",
     "type": "type",
     "from": "from",
@@ -19,13 +20,15 @@
 
   "type_values": {
     "HELLO": "hello",
+    "ECHO": "echo",
     "MESSAGE": "message",
     "INFO": "info"
   },
 
   "defaults": {
-    "ttl": 8
+    "ttl": 16,
+    "hello_ttl": 1
   },
 
-  "required_fields": ["proto", "type", "from", "to", "ttl", "payload"]
+  "required_fields": ["version", "proto", "type", "from", "to", "ttl", "payload"]
 }
