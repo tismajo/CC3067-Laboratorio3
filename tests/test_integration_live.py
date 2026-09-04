@@ -97,18 +97,19 @@ def test_message_from_a_reaches_c_through_b(tmp_path):
         for name, node in nodes.items():
             assert node.proc.poll() is None, f"el nodo {name} murió al arrancar"
 
+        c_addr = f"127.0.0.1:{ports['C']}"
         deadline = time.time() + 45
         attempt = 0
         while time.time() < deadline:
             attempt += 1
-            nodes["A"].send(f"C: ping-{attempt}")
+            nodes["A"].send(f"{c_addr}: ping-{attempt}")
             time.sleep(3)
             if nodes["C"].saw(f"ping-{attempt}"):
                 break
         else:
             raise AssertionError("el mensaje de A nunca llegó a C pasando por B")
 
-        assert nodes["C"].saw("mensaje de A")
+        assert nodes["C"].saw("mensaje de 127.0.0.1:")
     finally:
         for node in nodes.values():
             node.stop()

@@ -1,0 +1,17 @@
+{
+  "_comment": "Archivo de red único. 'nodes' = ID -> IP (puerto por defecto abajo). 'links' = enlaces con peso (bidireccionales). Cada nodo deriva sus vecinos de aquí; se levanta con --node <ID>.",
+  "port": 5000,
+  "nodes": {
+    "A": "192.168.0.60",
+    "B": "192.168.0.149",
+    "C": "192.168.0.119",
+    "D": "192.168.0.106",
+    "F": "192.168.0.153"
+  },
+  "links": [
+    {"a": "A", "b": "C", "weight": 2},
+    {"a": "B", "b": "C", "weight": 1},
+    {"a": "C", "b": "D", "weight": 3},
+    {"a": "C", "b": "F", "weight": 8}
+  ]
+}

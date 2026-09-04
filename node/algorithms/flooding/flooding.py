@@ -9,31 +9,25 @@ import threading
 from node.algorithms.flooding.neighbor_discovery import NeighborTable
 from shared import constants as c
 from shared.interfaces import RoutingAlgorithm
-
-
-PACKET_ID_HEADER = "packet_id"
+from shared.protocol import MSG_ID_HEADER, get_header
 
 
 def get_packet_id(packet: dict) -> str:
-    """Obtiene el ID explícito o genera una huella estable del paquete.
+    """ID lógico del paquete para deduplicar en flooding.
 
-    El TTL se excluye de la huella porque cambia en cada salto. Se recomienda
-    incluir ``{"packet_id": "..."}`` en ``headers`` para distinguir envíos
-    legítimos con el mismo contenido.
+    Se usa ``msg_id`` (se conserva al reenviar). Si falta, un hash de
+    ``(from, to, type, payload)``. El TTL NUNCA entra: cambia en cada salto y
+    haría que cada copia pareciera nueva (PROTOCOLO.md §message).
     """
 
-    headers = packet.get(c.FIELD_HEADERS, [])
-    header_items = headers if isinstance(headers, list) else [headers]
-    for header in header_items:
-        if isinstance(header, dict) and header.get(PACKET_ID_HEADER) is not None:
-            return str(header[PACKET_ID_HEADER])
+    msg_id = get_header(packet, MSG_ID_HEADER)
+    if msg_id is not None:
+        return str(msg_id)
 
     identity = {
-        c.FIELD_PROTO: packet.get(c.FIELD_PROTO),
-        c.FIELD_TYPE: packet.get(c.FIELD_TYPE),
         c.FIELD_FROM: packet.get(c.FIELD_FROM),
         c.FIELD_TO: packet.get(c.FIELD_TO),
-        c.FIELD_HEADERS: headers,
+        c.FIELD_TYPE: packet.get(c.FIELD_TYPE),
         c.FIELD_PAYLOAD: packet.get(c.FIELD_PAYLOAD),
     }
     encoded = json.dumps(
@@ -82,7 +76,7 @@ def get_forward_targets(
 
 
 def decrement_ttl(packet: dict) -> dict:
-    """Devuelve una copia con TTL-1, sin modificar el paquete original."""
+    """Devuelve una copia con TTL-1, sin modificar el original."""
 
     ttl = packet.get(c.FIELD_TTL)
     if not isinstance(ttl, int) or isinstance(ttl, bool):
@@ -113,6 +107,7 @@ class FloodingRoutingAlgorithm(RoutingAlgorithm):
     def initialize(self, node_id: str, neighbors: list) -> None:
         self.node_id = node_id
         self.self_info["node_id"] = node_id
+        self.self_info.setdefault("proto", c.PROTO_FLOODING)
         self.neighbor_table = NeighborTable(
             neighbors,
             timeout=self.neighbor_table.timeout,
@@ -124,9 +119,10 @@ class FloodingRoutingAlgorithm(RoutingAlgorithm):
             )
 
     def handle_hello_packet(self, packet: dict) -> dict:
-        """Actualiza descubrimiento con un HELLO recibido."""
-
         return self.neighbor_table.on_hello_received(packet)
+
+    def handle_echo_packet(self, packet: dict) -> dict:
+        return self.neighbor_table.on_echo_received(packet)
 
     def flood(
         self,
@@ -147,8 +143,6 @@ class FloodingRoutingAlgorithm(RoutingAlgorithm):
             return [(target, dict(forwarded)) for target in targets]
 
     def handle_info_packet(self, packet: dict) -> None:
-        """Acepta INFO para cumplir la interfaz y agenda una copia por vecino."""
-
         transmissions = self.flood(packet, packet.get(c.FIELD_FROM))
         if not transmissions:
             return

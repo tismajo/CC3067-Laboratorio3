@@ -43,9 +43,15 @@ class HealthChecker:
 
     def _run(self) -> None:
         while not self._stop_event.wait(self.interval_seconds):
-            self.check_once()
-            if self._on_tick is not None:
-                self._on_tick()
+            # ponytail: except amplio a propósito. Un fallo en check_once o en
+            # on_tick no debe matar el hilo: sin heartbeat el nodo deja de
+            # detectar caídas y de re-anunciar su LSP para siempre.
+            try:
+                self.check_once()
+                if self._on_tick is not None:
+                    self._on_tick()
+            except Exception as error:  # noqa: BLE001
+                print(f"[health-check] tick falló: {error}")
 
     def check_once(self) -> None:
         for neighbor in self.neighbors:

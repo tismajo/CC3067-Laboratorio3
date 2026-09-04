@@ -1,19 +1,27 @@
 """
 Fase 3 (Infraestructura de red)
 
-Encargado de abrir el socket del nodo, escuchar conexiones/paquetes entrantes
-y exponer un método para enviar paquetes a otro nodo (por IP:puerto).
+Abre el socket del nodo, escucha paquetes entrantes y envía a otro nodo por
+IP:puerto.
 
-Un paquete = una conexión TCP: connect -> enviar JSON -> cerrar. No se
-mantienen conexiones persistentes entre nodos.
+Transporte (ver PROTOCOLO.md §Transporte): TCP, UTF-8, NDJSON — un objeto JSON
+por línea terminado en ``\\n``. El receptor acumula bytes hasta el delimitador y
+procesa cada línea. Una línea mayor a ``MAX_LINE_BYTES`` se descarta y se
+registra. Se puede abrir una conexión por envío o mantener una por vecino.
 """
 
+import logging
 import socket
 import threading
 
-from shared.protocol import serialize
+from shared.protocol import MAX_LINE_BYTES, serialize
+
+logger = logging.getLogger("socket")
 
 CONNECT_TIMEOUT_SECONDS = 5
+# Escuchar en todas las interfaces: el `ip` del config es solo la identidad
+# anunciada, no siempre una dirección asignable localmente.
+LISTEN_HOST = "0.0.0.0"
 
 
 class NeighborUnreachableError(Exception):
@@ -35,7 +43,7 @@ class SocketManager:
     def start_listening(self, on_packet_received) -> None:
         self._server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self._server_socket.bind((self.ip, self.port))
+        self._server_socket.bind((LISTEN_HOST, self.port))
         self._server_socket.listen()
         self._running = True
 
@@ -60,23 +68,37 @@ class SocketManager:
 
     def _handle_connection(self, conn: socket.socket, addr, on_packet_received) -> None:
         with conn:
-            chunks = []
+            buffer = b""
             while True:
                 chunk = conn.recv(4096)
                 if not chunk:
                     break
-                chunks.append(chunk)
-            if chunks:
-                raw = b"".join(chunks).decode("utf-8")
-                on_packet_received(raw, addr)
+                buffer += chunk
+                while b"\n" in buffer:
+                    line, buffer = buffer.split(b"\n", 1)
+                    self._deliver(line, addr, on_packet_received)
+                if len(buffer) > MAX_LINE_BYTES:
+                    logger.warning("Línea > %d bytes de %s: descartada", MAX_LINE_BYTES, addr)
+                    buffer = b""
+            self._deliver(buffer, addr, on_packet_received)
+
+    @staticmethod
+    def _deliver(line: bytes, addr, on_packet_received) -> None:
+        line = line.strip()
+        if not line:
+            return
+        if len(line) > MAX_LINE_BYTES:
+            logger.warning("Línea > %d bytes de %s: descartada", MAX_LINE_BYTES, addr)
+            return
+        on_packet_received(line, addr)
 
     def send(self, to_ip: str, to_port: int, packet: dict) -> None:
-        raw = serialize(packet)
+        raw = serialize(packet) + b"\n"
         try:
             with socket.create_connection(
                 (to_ip, to_port), timeout=CONNECT_TIMEOUT_SECONDS
             ) as conn:
-                conn.sendall(raw.encode("utf-8"))
+                conn.sendall(raw)
         except OSError as error:
             raise NeighborUnreachableError(to_ip, to_port, error) from error
 

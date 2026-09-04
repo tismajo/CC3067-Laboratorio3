@@ -1,8 +1,12 @@
-"""Descubrimiento y estado de vecinos directos para Flooding.
+"""Descubrimiento y estado de vecinos directos.
 
-Este módulo no abre sockets. Construye paquetes HELLO y actualiza una tabla
-en memoria a partir de paquetes recibidos; la infraestructura de red decide
-cuándo y cómo enviarlos.
+No abre sockets. Construye paquetes ``hello`` y actualiza una tabla en memoria a
+partir de ``hello``/``echo`` recibidos; la infraestructura de red decide cuándo
+enviarlos.
+
+RTT (ver PROTOCOLO.md §hello/echo): el ``hello`` lleva ``t0`` en un header. El
+vecino responde un ``echo`` con el MISMO ``t0``. Quien envió el ``hello`` calcula
+``RTT = ahora - t0`` contra su propio reloj, sin necesidad de relojes sincronizados.
 """
 
 from __future__ import annotations
@@ -12,16 +16,26 @@ import time
 from collections.abc import Callable, Iterable
 
 from shared import constants as c
-from shared.protocol import build_packet
+from shared.protocol import (
+    T0_HEADER,
+    build_message,
+    get_header,
+    make_hello_payload,
+    normalize_addr,
+)
+
+
+def _addr_parts(address: str, default_port: int) -> tuple[str, int]:
+    address = normalize_addr(address, default_port)
+    host, _, port = address.partition(":")
+    try:
+        return host, int(port)
+    except ValueError:
+        return host, default_port
 
 
 class NeighborTable:
-    """Tabla thread-safe de vecinos configurados o descubiertos.
-
-    Los vecinos configurados empiezan inactivos hasta recibir un HELLO. Esto
-    evita reenviar tráfico por un enlace que todavía no se ha comprobado.
-    ``expire_stale`` permite al health check marcar caídas por timeout.
-    """
+    """Tabla thread-safe de vecinos. La identidad es la dirección ``IP:puerto``."""
 
     def __init__(
         self,
@@ -33,8 +47,6 @@ class NeighborTable:
             raise ValueError("El timeout debe ser mayor que cero")
 
         self.timeout = float(timeout)
-        # HELLO viaja entre procesos y equipos, por lo que su timestamp debe
-        # pertenecer a un reloj comparable entre hosts.
         self._clock = clock or time.time
         self._neighbors: dict[str, dict] = {}
         self._lock = threading.RLock()
@@ -64,7 +76,7 @@ class NeighborTable:
         target: str,
         timestamp: float | None = None,
     ) -> dict:
-        """Construye un HELLO dirigido a un vecino."""
+        """Construye un ``hello`` dirigido a un vecino."""
 
         node_id = self_info.get("node_id")
         if not isinstance(node_id, str) or not node_id:
@@ -72,69 +84,65 @@ class NeighborTable:
         if not isinstance(target, str) or not target:
             raise ValueError("target debe ser un node_id válido")
 
-        sent_at = self._clock() if timestamp is None else float(timestamp)
-        payload = {
-            "node_id": node_id,
-            "ip": self_info.get("ip"),
-            "port": self_info.get("port"),
-            "sent_at": sent_at,
-        }
-        return build_packet(
-            proto=c.PROTO_FLOODING,
+        _, listen_port = _addr_parts(node_id, self_info.get("port", 5000))
+        return build_message(
+            proto=self_info.get("proto", c.PROTO_FLOODING),
             type_=c.TYPE_HELLO,
-            from_=node_id,
-            to=target,
-            ttl=1,
-            payload=payload,
+            src=node_id,
+            dst=target,
+            payload=make_hello_payload(self_info.get("port", listen_port)),
+            ttl=c.HELLO_TTL,
+            t0=self._clock() if timestamp is None else float(timestamp),
         )
 
     def build_hello_packets(self, self_info: dict) -> list[dict]:
-        """Construye un HELLO para cada vecino conocido."""
-
         return [
             self.build_hello_packet(self_info, neighbor["node_id"])
             for neighbor in self.get_neighbors()
         ]
 
     def on_hello_received(self, packet: dict) -> dict:
-        """Marca activo al emisor de un HELLO y actualiza su retardo."""
+        """Marca activo al emisor de un ``hello``. No mide RTT (llega con el echo)."""
 
         if packet.get(c.FIELD_TYPE) != c.TYPE_HELLO:
             raise ValueError("Se esperaba un paquete HELLO")
+        return self._touch(packet, delay=None)
 
+    def on_echo_received(self, packet: dict) -> dict:
+        """Procesa la respuesta ``echo`` a un ``hello`` propio: mide el RTT."""
+
+        if packet.get(c.FIELD_TYPE) != c.TYPE_ECHO:
+            raise ValueError("Se esperaba un paquete ECHO")
+        now = self._clock()
+        t0 = get_header(packet, T0_HEADER)
+        delay = None
+        if isinstance(t0, (int, float)) and not isinstance(t0, bool):
+            delay = max(0.0, now - float(t0))
+        return self._touch(packet, delay=delay)
+
+    def _touch(self, packet: dict, delay: float | None) -> dict:
         node_id = packet.get(c.FIELD_FROM)
         if not isinstance(node_id, str) or not node_id:
-            raise ValueError("El paquete HELLO no contiene un emisor válido")
+            raise ValueError("El paquete no contiene un emisor válido")
 
-        payload = packet.get(c.FIELD_PAYLOAD)
-        if payload is None:
-            payload = {}
+        payload = packet.get(c.FIELD_PAYLOAD) or {}
         if not isinstance(payload, dict):
-            raise ValueError("El payload de HELLO debe ser un objeto")
+            raise ValueError("El payload de hello/echo debe ser un objeto")
 
+        host, default_port = _addr_parts(node_id, 5000)
+        listen_port = payload.get("listen_port")
         now = self._clock()
-        sent_at = payload.get("sent_at")
-        delay = None
-        if isinstance(sent_at, (int, float)) and not isinstance(sent_at, bool):
-            delay = max(0.0, now - float(sent_at))
-
         with self._lock:
             entry = self._neighbors.setdefault(node_id, {"node_id": node_id})
-            for field in ("ip", "port"):
-                if payload.get(field) is not None:
-                    entry[field] = payload[field]
-            entry.update(
-                {
-                    "active": True,
-                    "delay": delay,
-                    "last_seen": now,
-                }
-            )
+            entry["ip"] = host
+            entry["port"] = listen_port if isinstance(listen_port, int) else default_port
+            entry["active"] = True
+            entry["last_seen"] = now
+            if delay is not None:
+                entry["delay"] = delay
             return dict(entry)
 
     def mark_up(self, node_id: str, delay: float | None = None) -> None:
-        """Marca manualmente un vecino activo (integración con health check)."""
-
         with self._lock:
             entry = self._neighbors.setdefault(node_id, {"node_id": node_id})
             entry["active"] = True
@@ -143,15 +151,11 @@ class NeighborTable:
                 entry["delay"] = float(delay)
 
     def mark_down(self, node_id: str) -> None:
-        """Marca un vecino caído sin eliminar su configuración."""
-
         with self._lock:
             if node_id in self._neighbors:
                 self._neighbors[node_id]["active"] = False
 
     def expire_stale(self, now: float | None = None) -> list[str]:
-        """Marca caídos los vecinos cuyo último HELLO superó el timeout."""
-
         current = self._clock() if now is None else float(now)
         expired = []
         with self._lock:
@@ -167,21 +171,15 @@ class NeighborTable:
         return expired
 
     def get_neighbor(self, node_id: str) -> dict | None:
-        """Devuelve una copia de un vecino o ``None`` si no existe."""
-
         with self._lock:
             entry = self._neighbors.get(node_id)
             return dict(entry) if entry is not None else None
 
     def get_neighbors(self) -> list[dict]:
-        """Devuelve copias de todos los vecinos en orden de configuración."""
-
         with self._lock:
             return [dict(entry) for entry in self._neighbors.values()]
 
     def get_active_neighbors(self) -> list[dict]:
-        """Devuelve copias de los vecinos cuyo enlace está activo."""
-
         with self._lock:
             return [
                 dict(entry)
