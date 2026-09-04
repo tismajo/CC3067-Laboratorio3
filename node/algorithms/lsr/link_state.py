@@ -78,11 +78,16 @@ class LinkStateRouter(RoutingAlgorithm):
 
         with self._lock:
             self.sequence += 1
-            lsp = build_lsp(
-                self.node_id,
-                self.sequence,
-                self.neighbor_table.get_active_neighbors(),
-            )
+            # Un HELLO de un nodo que no está en neighbors (vecino mal
+            # configurado del lado de quien envía) crea una entrada sin
+            # weight; no hay costo que anunciar para ese enlace, así que se
+            # excluye en vez de tronar build_lsp.
+            advertised_neighbors = [
+                neighbor
+                for neighbor in self.neighbor_table.get_active_neighbors()
+                if "weight" in neighbor
+            ]
+            lsp = build_lsp(self.node_id, self.sequence, advertised_neighbors)
             self.lsp_db[self.node_id] = lsp
             self.recompute_routing_table()
 
