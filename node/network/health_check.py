@@ -71,6 +71,9 @@ class HealthChecker:
             if self._on_status_change is not None:
                 self._on_status_change(node_id, True)
 
+    def status(self) -> dict:
+        return dict(self._is_up)
+
     def stop(self) -> None:
         self._stop_event.set()
         if self._thread is not None:

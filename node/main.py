@@ -131,7 +131,10 @@ def _run_live(mode: str, config: dict, algorithm) -> None:
     health_checker.start()
 
     print(f"[{node_id}] escuchando en {config['ip']}:{config['port']} (modo {mode})")
-    print("escribe 'destino: mensaje' para enviar, 'tabla' para ver rutas, Ctrl+C para salir")
+    print(
+        "escribe 'destino: mensaje' para enviar, 'tabla' para ver rutas, "
+        "'vecinos' para ver quién está arriba, Ctrl+C para salir"
+    )
     try:
         for line in sys.stdin:
             line = line.rstrip("\n").strip()
@@ -145,10 +148,21 @@ def _run_live(mode: str, config: dict, algorithm) -> None:
                     print(f"  {destination}\t{snapshot[destination]}")
                 continue
 
+            if line == "vecinos":
+                status = health_checker.status()
+                print(f"[{node_id}] estado de vecinos:")
+                for neighbor_id in sorted(status):
+                    estado = "arriba" if status[neighbor_id] else "caído"
+                    print(f"  {neighbor_id}\t{estado}")
+                continue
+
             destination, separator, payload = line.partition(":")
             destination, payload = destination.strip(), payload.strip()
             if not separator or not destination or not payload:
-                print("formato esperado: destino: mensaje  (o 'tabla' para ver rutas)")
+                print(
+                    "formato esperado: destino: mensaje  "
+                    "(o 'tabla' / 'vecinos' para inspeccionar el nodo)"
+                )
                 continue
             forwarder.send_message(destination, payload)
     except KeyboardInterrupt:
